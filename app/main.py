@@ -4,6 +4,7 @@ import os
 import httpx
 from datetime import date
 import json
+import logging
 
 # Load environment variables
 load_dotenv()
@@ -16,7 +17,7 @@ SCRAPIN_KEY = os.getenv("SCRAPIN_API_KEY")
 SCRAPIN_URL = "https://api.scrapin.io/enrichment/profile"
 
 # Cache file path
-CACHE_FILE = "app/linkedin_cache.json"
+CACHE_FILE = "linkedin_cache.json"
 
 @app.get("/linkedin")
 async def get_profile(linkedInUrl: str = "https://www.linkedin.com/in/ferranterico/"):
@@ -24,28 +25,30 @@ async def get_profile(linkedInUrl: str = "https://www.linkedin.com/in/ferranteri
     if not SCRAPIN_KEY:
         raise HTTPException(status_code=500, detail="Scrapin API key is missing")
 
-    # Get today's date and check if it's an uneven day
+    # Get today's date
     today = date.today()
 
     try:
-        # Check if the cache exists
-        if os.path.exists(CACHE_FILE):
-            with open(CACHE_FILE, "r") as cache_file:
-                cache = json.load(cache_file)
+        # Ensure the cache file exists
+        if not os.path.exists(CACHE_FILE):
+            # Initialize the cache file with default content
+            with open(CACHE_FILE, "w") as cache_file:
+                json.dump({"last_request_date": None, "data": None}, cache_file)
 
-            # If the cache is for today, return it (even or uneven day)
-            if cache["last_request_date"] == str(today):
-                return {"message": "Cached data", "data": cache["data"]}
+        # Load the cache content
+        with open(CACHE_FILE, "r") as cache_file:
+            cache = json.load(cache_file)
 
-        # If it's an even day and no cache exists, make a request
+        # If the cache is for today, return the cached data
+        if cache["last_request_date"] == str(today):
+            return {"message": "Cached data", "data": cache["data"]}
+
+        # If it's an even day, use the cache if available or make a request
         if today.day % 2 == 0:
-            if not os.path.exists(CACHE_FILE):
-                return await make_scrapin_request(linkedInUrl, today)
-
-            # If cache exists, return it
-            with open(CACHE_FILE, "r") as cache_file:
-                cache = json.load(cache_file)
+            if cache["data"]:
                 return {"message": "Cached data (even day)", "data": cache["data"]}
+            else:
+                return await make_scrapin_request(linkedInUrl, today)
 
         # If it's an uneven day, make a new request
         return await make_scrapin_request(linkedInUrl, today)
@@ -89,6 +92,7 @@ async def make_scrapin_request(linkedInUrl, today):
             status_code=500,
             detail=f"An error occurred while requesting the Scrapin API: {str(exc)}"
         )
+
 
 @app.get("/github")
 async def get_user_repos():
