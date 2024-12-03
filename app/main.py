@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 import httpx
@@ -18,6 +19,15 @@ SCRAPIN_URL = "https://api.scrapin.io/enrichment/profile"
 
 # Cache file path
 CACHE_FILE = "linkedin_cache.json"
+
+# Allow requests from the frontend (localhost:3000)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
+)
 
 @app.get("/linkedin")
 async def get_profile(linkedInUrl: str = "https://www.linkedin.com/in/ferranterico/"):
